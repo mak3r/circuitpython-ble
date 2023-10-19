@@ -127,8 +127,9 @@ def write_ble(content:bytes = b''):
         if time.monotonic() - response_time > response_delay:
             print("response delay expired")
             break;
-    byte_count = uart.in_waiting
-    if byte_count > 0:
+    # byte_count = uart.in_waiting
+    while uart.in_waiting:
+        byte_count = uart.in_waiting
         data = uart.read(byte_count)
         if data:
             parse_data()
