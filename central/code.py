@@ -1,11 +1,8 @@
 import time
-import random
 import displayio
-import digitalio
 import terminalio
-import adafruit_imageload
-import board
 import gc
+import json
 
 from adafruit_ble import BLERadio
 from adafruit_ble import Advertisement
@@ -46,9 +43,38 @@ ble = BLERadio()
 # print("BLE Radio name:", ble.name)
 uart = None
 billboard = None
+# When we are waiting for a response from sending a prev/next request
+await_message = False
+# A byte array of json formatted content
+response = bytearray('', 'utf-8')
 
-def parse_data():
-    pass
+
+curly_count = 0
+def capture_json(data = b''):
+    global curly_count
+    global await_message
+    print(data)
+    for i in data:
+        if i == b'{'[0]:
+            curly_count += 1
+        if i == b'}'[0]:
+            curly_count -= 1
+    if await_message:
+        response.extend(data)
+        print(response)
+    if curly_count == 0:
+        await_message = False
+
+# Call this method only after the response variable is believed to have 
+# valid json formatted content
+def parse_data() -> dict:
+    parsed = None
+    try:
+        parsed = json.loads(response)
+    except Exception as e:
+        print("failed to parse response:", response)
+        #TODO: handle the failure
+    return parsed
 
 def update_bg():
     pass
@@ -116,26 +142,35 @@ def connect(billboard=None):
                 update_label("Connection failed.\nTry rescan[A+B].")
             print(e)
 
-response_delay = 0.5
+response_delay = 50 #milliseconds
 def write_ble(content:bytes = b''):
+    global await_message
+    global response
     response_time = time.monotonic()
     uart.reset_input_buffer()
     uart.write(content)
+    await_message = True
     while uart.in_waiting is 0:
         #block until a response is received or the response delay
         # time expires
         if time.monotonic() - response_time > response_delay:
             print("response delay expired")
             break;
-    # byte_count = uart.in_waiting
-    while uart.in_waiting:
+    
+    data = b''
+    response = bytearray('', 'utf-8')
+    while await_message:
         byte_count = uart.in_waiting
         data = uart.read(byte_count)
         if data:
-            parse_data()
-            update_label(data.decode('utf-8'))
+            capture_json(data) #tests for await_message is True
 
-
+    msg = parse_data()
+    print(msg)
+    print(msg.get("msg")) # a dict object
+    print(json.dumps(msg.get("msg"))) # a string object
+    
+    update_label(json.dumps(msg.get("msg")))
 
 #NOTE: Consider using Packets for transporting billboard data
 button_delay = 0.2
