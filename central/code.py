@@ -79,10 +79,26 @@ def parse_data() -> dict:
 def update_bg():
     pass
 
-def update_label(text=""):
-    in_label.text = text
-    print(text)
-    print("\n")
+def update_label(content=None):
+    if type(content) is dict:
+        try:
+            in_label.text = content.get("text")
+            in_label.color = int(content.get("fg"),16)
+            in_label.background_color = int(content.get("bg"),16)
+            # ceiling of (clue display dpi / matrix display dpi) [display widths]
+            in_label.scale = -(-252//64) 
+        except Exception as e:
+            c = json.dumps(content)
+            err = "Error in dictionary content\n"
+            print(err, c)
+            update_label(err + c)
+    elif type(content) is str:
+        in_label.text = content
+        in_label.color = 0xFFFFFF
+        in_label.background_color = None
+        in_label.scale = 2
+    else:
+        in_label.text = "ERROR\nCONTENT INVALID\nCHECK BILLBOARD"
 
 update_label("[A+B] to scan\nfor billboard")
 
@@ -167,10 +183,9 @@ def write_ble(content:bytes = b''):
 
     msg = parse_data()
     print(msg)
-    print(msg.get("msg")) # a dict object
-    print(json.dumps(msg.get("msg"))) # a string object
+    print(json.dumps(msg)) # a string object
     
-    update_label(json.dumps(msg.get("msg")))
+    update_label(msg)
 
 #NOTE: Consider using Packets for transporting billboard data
 button_delay = 0.2
